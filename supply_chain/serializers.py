@@ -12,6 +12,48 @@ class ContactSerializer(serializers.ModelSerializer):
         model = Contact
         exclude = ('network_entity',)
 
+    def create(self, validated_data):
+        """
+        Создает новый объект Contact с связанным объектом NetworkEntity.
+        Извлекает ID связанной сущности NetworkEntity из валидированных данных и создает контакт, связывая его с этой сущностью.
+
+        Аргументы:
+        validated_data: Словарь валидированных данных для создания контакта.
+
+        Возвращает:
+        Созданный объект Contact.
+        """
+        network_entity = validated_data.pop('network_entity', None)
+        if network_entity is None:
+            raise serializers.ValidationError("network_entity is required")
+
+        contact = Contact.objects.create(network_entity=network_entity, **validated_data)
+        return contact
+
+    def update(self, instance, validated_data):
+        """
+        Обновляет существующий объект Contact.
+        Извлекает ID связанной сущности NetworkEntity из валидированных данных и обновляет контакт, связывая его с новой сущностью.
+
+        Аргументы:
+        instance: Экземпляр Contact для обновления.
+        validated_data: Словарь валидированных данных для обновления контакта.
+
+        Возвращает:
+        Обновленный объект Contact.
+        """
+        network_entity_id = validated_data.pop('network_entity_id', None)
+
+        if network_entity_id:
+            network_entity = NetworkEntity.objects.get(id=network_entity_id)
+            instance.network_entity = network_entity
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        return instance
+
 
 class ProductSerializer(serializers.ModelSerializer):
     """
@@ -22,6 +64,51 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         exclude = ('network_entity',)
+
+    def create(self, validated_data):
+        """
+        Создает новый объект Product с связанным объектом NetworkEntity.
+        Извлекает ID связанной сущности NetworkEntity из валидированных данных и создает продукт, связывая его с этой сущностью.
+
+        Аргументы:
+        validated_data: Словарь валидированных данных для создания продукта.
+
+        Возвращает:
+        Созданный объект Product.
+        """
+        network_entity_id = validated_data.pop('network_entity_id', None)
+        product = Product(**validated_data)
+
+        if network_entity_id:
+            network_entity = NetworkEntity.objects.get(id=network_entity_id)
+            product.network_entity = network_entity
+
+        product.save()
+        return product
+
+    def update(self, instance, validated_data):
+        """
+        Обновляет существующий объект Product.
+        Извлекает ID связанной сущности NetworkEntity из валидированных данных и обновляет продукт, связывая его с новой сущностью.
+
+        Аргументы:
+        instance: Экземпляр Product для обновления.
+        validated_data: Словарь валидированных данных для обновления продукта.
+
+        Возвращает:
+        Обновленный объект Product.
+        """
+        network_entity_id = validated_data.pop('network_entity_id', None)
+
+        if network_entity_id:
+            network_entity = NetworkEntity.objects.get(id=network_entity_id)
+            instance.network_entity = network_entity
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        return instance
 
 
 class NetworkEntityListSerializer(serializers.ModelSerializer):
@@ -47,20 +134,26 @@ class NetworkEntityCreateUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NetworkEntity
-        exclude = ('debt',)  # Исключаем поле 'debt'
+        exclude = ('debt',)
 
     def create(self, validated_data):
         """
-        Создает новую сущность NetworkEntity и связанные с ней объекты Contact и Product.
-        Аргументы: validated_data: Данные, прошедшие валидацию, для создания NetworkEntity и связанных объектов.
-        Возвращает: Созданный объект NetworkEntity.
+        Создает новый объект NetworkEntity и связанные объекты Contact и Product.
+        Извлекает данные для контактов и продуктов из validated_data, затем создает основную сущность.
+        После создания основной сущности, создает связанные объекты Contact и Product, связывая их с созданной сущностью NetworkEntity.
+
+        Аргументы:
+        validated_data: Словарь данных, прошедших валидацию, для создания сущности NetworkEntity и связанных объектов.
+
+        Возвращает:
+        Новосозданный объект NetworkEntity с связанными объектами Contact и Product.
         """
         contact_data = validated_data.pop('contact')
-        products_data = validated_data.pop('products', [])
+        products_data = validated_data.pop('products')
 
-        contact = Contact.objects.create(**contact_data)
+        network_entity = NetworkEntity.objects.create(**validated_data)
 
-        network_entity = NetworkEntity.objects.create(contact=contact, **validated_data)
+        Contact.objects.create(network_entity=network_entity, **contact_data)
 
         for product_data in products_data:
             Product.objects.create(network_entity=network_entity, **product_data)
@@ -70,11 +163,15 @@ class NetworkEntityCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         """
         Обновляет существующий объект NetworkEntity и связанные с ним объекты Contact и Product.
+        Извлекает данные для контактов и продуктов из validated_data, затем обновляет основную сущность.
+        После обновления основной сущности, обновляет связанные объекты Contact и Product, связывая обновленные данные с существующей сущностью NetworkEntity.
+
         Аргументы:
         instance: Экземпляр NetworkEntity для обновления.
-        validated_data: Данные, прошедшие валидацию, для обновления.
+        validated_data: Данные, прошедшие валидацию, для обновления сущности NetworkEntity и связанных объектов.
+
         Возвращает:
-        Обновленный объект NetworkEntity.
+        Обновленный объект NetworkEntity с связанными объектами Contact и Product.
         """
         contact_data = validated_data.pop('contact')
         products_data = validated_data.pop('products', [])
